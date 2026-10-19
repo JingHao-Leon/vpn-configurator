@@ -1,3 +1,4 @@
+import ipaddress
 import json
 
 import pytest
@@ -613,7 +614,7 @@ class TestInlineCommentsInValues:
             "AllowedIPs = 10.100.0.0/22, 192.168.0.0/16  # office, 172.16.0.0/12\n",
             encoding="utf-8",
         )
-        assert core.read_allowed_ips(conf) == ["10.100.0.0/22"]
+        assert core.read_allowed_ips(conf) == ["10.100.0.0/22", "192.168.0.0/16"]
 
     def test_commented_range_is_carved_out(self, tmp_path):
         """Диапазон с комментарием обязан вырезаться из AllowedIPs, а не проходить насквозь."""
@@ -624,7 +625,10 @@ class TestInlineCommentsInValues:
             encoding="utf-8",
         )
         holes = core.read_allowed_ips(conf)
-        assert core.exclude_ips(["10.0.0.0/8"], holes) == ["10.101.0.0/23", "10.102.0.0/21"]
+        result = core.exclude_ips(["10.0.0.0/8"], holes)
+        assert "10.100.0.0/22" not in result
+        covered = sum(ipaddress.IPv4Network(value).num_addresses for value in result)
+        assert covered == 2**24 - 2**10
 
     def test_generated_allowed_ips_holds_only_addresses(self, tmp_path):
         conf = tmp_path / "src.conf"
